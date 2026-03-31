@@ -1,3 +1,18 @@
+type SignedDelegation = record {
+  signature : text;
+  delegation : record {
+    pubkey : text;
+    expiration : text;
+    targets : opt vec text;
+  };
+};
+
+type DelegationChain = record {
+  publicKey : text;
+  delegations : vec SignedDelegation;
+};
+
 service : {
-  greet : (name : text) -> (text) query
+  store_delegation : (uuid : text, chain : DelegationChain) -> ();
+  get_delegation : (uuid : text) -> (opt DelegationChain) query;
 }

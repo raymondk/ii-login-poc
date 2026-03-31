@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { AuthClient } from "@icp-sdk/auth/client";
 import { HttpAgent } from "@icp-sdk/core/agent";
-import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
+import { DelegationChain, DelegationIdentity, type JsonnableDelegationChain } from "@icp-sdk/core/identity";
 import type { PublicKey, DerEncodedPublicKey } from "@icp-sdk/core/agent";
 import { createActor } from "./backend/api/backend";
 import { getCanisterEnv } from "@icp-sdk/core/agent/canister-env";
@@ -46,13 +46,13 @@ function base64ToBytes(base64: string): Uint8Array {
  */
 async function createDelegationForKey(
   authClient: AuthClient
-): Promise<void> {
-  if (!targetPublicKeyParam) return;
+): Promise<JsonnableDelegationChain | null> {
+  if (!targetPublicKeyParam) return null;
 
   const identity = authClient.getIdentity();
   if (!(identity instanceof DelegationIdentity)) {
     console.error("Expected a DelegationIdentity after login");
-    return;
+    return null;
   }
 
   const targetDerBytes = base64ToBytes(targetPublicKeyParam);
@@ -69,7 +69,9 @@ async function createDelegationForKey(
     { previous: existingChain }
   );
 
-  console.log("Delegation chain for key: %s", JSON.stringify(delegationChain.toJSON()));
+  const json = delegationChain.toJSON();
+  console.log("Delegation chain for key: ", json);
+  return json;
 }
 
 function App() {
@@ -94,8 +96,8 @@ function App() {
       onSuccess: async () => {
         const identity = authClient.getIdentity();
         setPrincipal(identity.getPrincipal().toText());
-        await createDelegationForKey(authClient);
-        storeDelegation();
+        const delegation = await createDelegationForKey(authClient);
+        storeDelegation(delegation);
       },
       onError: (error) => {
         console.error("Login failed:", error);
@@ -103,8 +105,8 @@ function App() {
     });
   }
 
-  function storeDelegation() {
-    if (!authClient) return;
+  function storeDelegation(delegation: JsonnableDelegationChain | null) {
+    if (!authClient || !delegation) return;
 
     const identity = authClient.getIdentity();
     const agent = HttpAgent.createSync({
@@ -115,8 +117,9 @@ function App() {
 
     const actor = createActor(canisterId, { agent });
 
-    actor.greet("greetings").then((result) => {
-      console.log("Result from canister call: %o", result);
+    const uuid = crypto.randomUUID();
+    actor.store_delegation(uuid, delegation).then(() => {
+      console.log("Delegation stored with uuid: %s", uuid);
     });
   }
 

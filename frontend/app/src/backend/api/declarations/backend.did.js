@@ -9,7 +9,27 @@
 import { IDL } from '@icp-sdk/core/candid';
 
 export const idlFactory = ({ IDL }) => {
-  return IDL.Service({ 'greet' : IDL.Func([IDL.Text], [IDL.Text], ['query']) });
+  const SignedDelegation = IDL.Record({
+    'signature' : IDL.Text,
+    'delegation' : IDL.Record({
+      'pubkey' : IDL.Text,
+      'targets' : IDL.Opt(IDL.Vec(IDL.Text)),
+      'expiration' : IDL.Text,
+    }),
+  });
+  const DelegationChain = IDL.Record({
+    'publicKey' : IDL.Text,
+    'delegations' : IDL.Vec(SignedDelegation),
+  });
+  
+  return IDL.Service({
+    'get_delegation' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(DelegationChain)],
+        ['query'],
+      ),
+    'store_delegation' : IDL.Func([IDL.Text, DelegationChain], [], []),
+  });
 };
 
 export const init = ({ IDL }) => { return []; };

@@ -10,6 +10,21 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
-export interface _SERVICE { 'greet' : ActorMethod<[string], string> }
+export interface DelegationChain {
+  'publicKey' : string,
+  'delegations' : Array<SignedDelegation>,
+}
+export interface SignedDelegation {
+  'signature' : string,
+  'delegation' : {
+    'pubkey' : string,
+    'targets' : [] | [Array<string>],
+    'expiration' : string,
+  },
+}
+export interface _SERVICE {
+  'get_delegation' : ActorMethod<[string], [] | [DelegationChain]>,
+  'store_delegation' : ActorMethod<[string, DelegationChain], undefined>,
+}
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];
