@@ -3,6 +3,7 @@ import Queue "mo:core/Queue";
 import Text "mo:core/Text";
 import Time "mo:core/Time";
 import Int "mo:core/Int";
+import Principal "mo:core/Principal";
 
 persistent actor {
 
@@ -52,7 +53,8 @@ persistent actor {
     };
   };
 
-  public func store_delegation(uuid : Text, chain : DelegationChain) : async () {
+  public shared(msg) func store_delegation(uuid : Text, chain : DelegationChain) : async () {
+    assert not Principal.isAnonymous(msg.caller);
     assert uuid.size() <= maxUuidLength;
     let now = Time.now();
     cleanupExpired(now - fiveMinutesNs);
