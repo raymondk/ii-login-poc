@@ -69,13 +69,12 @@ async function createDelegationForKey(
     { previous: existingChain }
   );
 
-  console.log("Delegation chain for key:", delegationChain.toJSON());
+  console.log("Delegation chain for key: %s", JSON.stringify(delegationChain.toJSON()));
 }
 
 function App() {
   const [authClient, setAuthClient] = useState<AuthClient | null>(null);
   const [principal, setPrincipal] = useState<string | null>(null);
-  const [greeting, setGreeting] = useState("");
 
   useEffect(() => {
     AuthClient.create({ keyType: "Ed25519" }).then(async (client) => {
@@ -96,6 +95,7 @@ function App() {
         const identity = authClient.getIdentity();
         setPrincipal(identity.getPrincipal().toText());
         await createDelegationForKey(authClient);
+        storeDelegation();
       },
       onError: (error) => {
         console.error("Login failed:", error);
@@ -103,15 +103,7 @@ function App() {
     });
   }
 
-  async function handleLogout() {
-    if (!authClient) return;
-    await authClient.logout();
-    setPrincipal(null);
-    setGreeting("");
-  }
-
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function storeDelegation() {
     if (!authClient) return;
 
     const identity = authClient.getIdentity();
@@ -122,11 +114,18 @@ function App() {
     });
 
     const actor = createActor(canisterId, { agent });
-    const nameInput = (event.target as HTMLFormElement).elements.namedItem(
-      "name"
-    ) as HTMLInputElement;
 
-    actor.greet(nameInput.value).then((result) => setGreeting(result));
+    actor.greet("greetings").then((result) => {
+      console.log("Result from canister call: %o", result);
+    });
+  }
+
+  // TODO After the login is successful and the delegation is stored
+  //      clear the browser state and close the window.
+  async function handleLogout() {
+    if (!authClient) return;
+    await authClient.logout();
+    setPrincipal(null);
   }
 
   const isAuthenticated = principal !== null;
@@ -148,17 +147,12 @@ function App() {
   return (
     <main className="page">
       <section className="panel">
-        <div className="brand" aria-label="ICP plus Vite">
-          <img src="/icp.svg" alt="ICP logo" className="brand-icp" />
-          <span className="plus">+</span>
-          <img src="/vite.svg" alt="Vite logo" className="brand-vite" />
-        </div>
-        <h1 className="title">Internet Identity Login</h1>
+        <h1 className="title">icp-cli Login</h1>
 
         {!isAuthenticated ? (
           <>
             <p className="subtitle">
-              Sign in with Internet Identity to create a delegation.
+              Sign in with Internet Identity.
             </p>
             <button
               className="button"
@@ -173,25 +167,10 @@ function App() {
             <p className="subtitle">
               Signed in as: <code>{principal}</code>
             </p>
-            <form className="form" action="#" onSubmit={handleSubmit}>
-              <label htmlFor="name">Enter your name</label>
-              <div className="controls">
-                <input
-                  id="name"
-                  alt="Name"
-                  type="text"
-                  className="input"
-                  placeholder="Ada Lovelace"
-                />
-                <button type="submit" className="button">
-                  Greet me
-                </button>
-              </div>
-            </form>
-            <section id="greeting" className="greeting" aria-live="polite">
-              {greeting}
-            </section>
-            <button className="button logout-button" onClick={handleLogout}>
+            <button
+              className="button"
+              onClick={handleLogout}
+            >
               Sign out
             </button>
           </>
