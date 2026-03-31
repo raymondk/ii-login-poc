@@ -15,9 +15,9 @@ const canisterEnv = getCanisterEnv<CanisterEnv>();
 const canisterId = canisterEnv["PUBLIC_CANISTER_ID:backend"];
 
 // Read the target public key from the `k` query parameter (base64-encoded DER).
-const targetPublicKeyParam = new URLSearchParams(window.location.search).get(
-  "k"
-);
+const params = new URLSearchParams(window.location.search);
+const targetPublicKeyParam = params.get("k");
+const uuidParam = params.get("uuid");
 
 function getIdentityProviderUrl() {
   const host = window.location.hostname;
@@ -117,9 +117,9 @@ function App() {
 
     const actor = createActor(canisterId, { agent });
 
-    const uuid = crypto.randomUUID();
-    actor.store_delegation(uuid, delegation).then(() => {
-      console.log("Delegation stored with uuid: %s", uuid);
+    if (!uuidParam) return;
+    actor.store_delegation(uuidParam, delegation).then(() => {
+      console.log("Delegation stored with uuid: %s", uuidParam);
     });
   }
 
@@ -133,14 +133,14 @@ function App() {
 
   const isAuthenticated = principal !== null;
 
-  if (!targetPublicKeyParam) {
+  if (!targetPublicKeyParam || !uuidParam) {
     return (
       <main className="page">
         <section className="panel">
-          <h1 className="title">Missing public key</h1>
+          <h1 className="title">Missing parameters</h1>
           <p className="subtitle">
             Provide a base64-encoded DER public key via the <code>k</code> query
-            parameter.
+            parameter and a session identifier via the <code>uuid</code> parameter.
           </p>
         </section>
       </main>
