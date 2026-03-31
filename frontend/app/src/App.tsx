@@ -133,7 +133,7 @@ function App() {
 
   const isAuthenticated = principal !== null;
 
-  if (!targetPublicKeyParam || !uuidParam) {
+  if (!targetPublicKeyParam || !uuidParam || uuidParam.length > 36) {
     return (
       <main className="page">
         <section className="panel">

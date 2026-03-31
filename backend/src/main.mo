@@ -33,6 +33,7 @@ persistent actor {
   // Maintain an ordered queue of uuids for cleanup
   let timeline : Queue.Queue<TimeEntry> = Queue.empty();
 
+  transient let maxUuidLength : Nat = 36;
   transient let fiveMinutesNs : Int = 5 * 60 * 1_000_000_000;
 
   func cleanupExpired(cutoff : Int) {
@@ -52,6 +53,7 @@ persistent actor {
   };
 
   public func store_delegation(uuid : Text, chain : DelegationChain) : async () {
+    assert uuid.size() <= maxUuidLength;
     let now = Time.now();
     cleanupExpired(now - fiveMinutesNs);
     Map.add(store, Text.compare, uuid, { chain; storedAt = now });
@@ -59,6 +61,7 @@ persistent actor {
   };
 
   public query func get_delegation(uuid : Text) : async ?DelegationChain {
+    if (uuid.size() > maxUuidLength) return null;
     switch (Map.get(store, Text.compare, uuid)) {
       case (?entry) {
         if (Time.now() - entry.storedAt <= fiveMinutesNs) {
