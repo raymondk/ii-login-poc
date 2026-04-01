@@ -60,6 +60,7 @@ Any authenticated caller can overwrite any UUID's stored delegation. An attacker
 - 8-hour delegation lifetime with no revocation mechanism
 - UUID in URL leaks via browser history, referer headers, and server logs
 - No public key format validation on the `k` parameter
+- Draining cycles by performing many registrations
 
 ## Prerequisites
 
