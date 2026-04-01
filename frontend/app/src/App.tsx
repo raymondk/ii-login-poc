@@ -18,6 +18,7 @@ const canisterId = canisterEnv["PUBLIC_CANISTER_ID:backend"];
 const params = new URLSearchParams(window.location.search);
 const targetPublicKeyParam = params.get("k");
 const uuidParam = params.get("uuid");
+const debugParam = params.has("debug");
 
 function getIdentityProviderUrl() {
   const host = window.location.hostname;
@@ -77,6 +78,7 @@ async function createDelegationForKey(
 function App() {
   const [authClient, setAuthClient] = useState<AuthClient | null>(null);
   const [principal, setPrincipal] = useState<string | null>(null);
+  const [isFinished, setFinished] = useState<boolean | null>(false);
 
   useEffect(() => {
     AuthClient.create({ keyType: "Ed25519" }).then(async (client) => {
@@ -118,13 +120,16 @@ function App() {
     const actor = createActor(canisterId, { agent });
 
     if (!uuidParam) return;
-    actor.store_delegation(uuidParam, delegation).then(() => {
+    actor.store_delegation(uuidParam, delegation).then(async () => {
       console.log("Delegation stored with uuid: %s", uuidParam);
+      setFinished(true);
+      if (!debugParam) {
+        await handleLogout();
+        setTimeout(() => window.close(), 3000);
+      }
     });
   }
 
-  // TODO After the login is successful and the delegation is stored
-  //      clear the browser state and close the window.
   async function handleLogout() {
     if (!authClient) return;
     await authClient.logout();
@@ -151,33 +156,50 @@ function App() {
     <main className="page">
       <section className="panel">
         <h1 className="title">icp-cli Login</h1>
+        { isFinished ? 
+          (<>
+              {debugParam ? (
+                <>
+                  <p className="subtitle">
+                    Debug is on, sign out manually
+                  </p>
+                  <button
+                    className="button"
+                    onClick={handleLogout}
+                  >
+                    Sign out
+                  </button>
+                </>
+              ) : (
+                <p className="subtitle">You can close this window...</p>
+              )}
+          </>
 
-        {!isAuthenticated ? (
-          <>
-            <p className="subtitle">
-              Sign in with Internet Identity.
-            </p>
-            <button
-              className="button"
-              onClick={handleLogin}
-              disabled={!authClient}
-            >
-              Sign in
-            </button>
-          </>
-        ) : (
-          <>
-            <p className="subtitle">
-              Signed in as: <code>{principal}</code>
-            </p>
-            <button
-              className="button"
-              onClick={handleLogout}
-            >
-              Sign out
-            </button>
-          </>
+          ) : (
+            <>
+            {!isAuthenticated ? (
+              <>
+                <p className="subtitle">
+                  Sign in with Internet Identity.
+                </p>
+                <button
+                  className="button"
+                  onClick={handleLogin}
+                  disabled={!authClient}
+                >
+                  Sign in
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="subtitle">
+                  Signed in as: <code>{principal}</code>
+                </p>
+              </>
+            )}
+            </>
         )}
+
       </section>
     </main>
   );
