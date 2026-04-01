@@ -63,24 +63,44 @@ export interface DelegationChain {
     publicKey: string;
     delegations: Array<SignedDelegation>;
 }
+export type RegisterResult = {
+    __kind__: "ok";
+    ok: string;
+} | {
+    __kind__: "err";
+    err: string;
+};
 export interface backendInterface {
     get_delegation(uuid: string): Promise<DelegationChain | null>;
-    store_delegation(uuid: string, chain: DelegationChain): Promise<void>;
+    lookup_code(code: string): Promise<string | null>;
+    register(uuid: string, public_key: string): Promise<RegisterResult>;
+    store_delegation(code: string, chain: DelegationChain): Promise<void>;
 }
-import type { DelegationChain as _DelegationChain, SignedDelegation as _SignedDelegation } from "./declarations/backend.did";
+import type { DelegationChain as _DelegationChain, RegisterResult as _RegisterResult, SignedDelegation as _SignedDelegation } from "./declarations/backend.did";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>){}
     async get_delegation(arg0: string): Promise<DelegationChain | null> {
         const result = await this.actor.get_delegation(arg0);
         return from_candid_opt_n1(result);
     }
+    async lookup_code(arg0: string): Promise<string | null> {
+        const result = await this.actor.lookup_code(arg0);
+        return from_candid_opt_n9(result);
+    }
+    async register(arg0: string, arg1: string): Promise<RegisterResult> {
+        const result = await this.actor.register(arg0, arg1);
+        return from_candid_RegisterResult_n10(result);
+    }
     async store_delegation(arg0: string, arg1: DelegationChain): Promise<void> {
-        const result = await this.actor.store_delegation(arg0, to_candid_DelegationChain_n9(arg1));
+        const result = await this.actor.store_delegation(arg0, to_candid_DelegationChain_n12(arg1));
         return result;
     }
 }
 function from_candid_DelegationChain_n2(value: _DelegationChain): DelegationChain {
     return from_candid_record_n3(value);
+}
+function from_candid_RegisterResult_n10(value: _RegisterResult): RegisterResult {
+    return from_candid_variant_n11(value);
 }
 function from_candid_SignedDelegation_n5(value: _SignedDelegation): SignedDelegation {
     return from_candid_record_n6(value);
@@ -89,6 +109,9 @@ function from_candid_opt_n1(value: [] | [_DelegationChain]): DelegationChain | n
     return value.length === 0 ? null : from_candid_DelegationChain_n2(value[0]);
 }
 function from_candid_opt_n8(value: [] | [Array<string>]): Array<string> | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n9(value: [] | [string]): string | null {
     return value.length === 0 ? null : value[0];
 }
 function from_candid_record_n3(value: {
@@ -138,16 +161,35 @@ function from_candid_record_n7(value: {
         expiration: value.expiration
     };
 }
+function from_candid_variant_n11(value: {
+    ok: string;
+} | {
+    err: string;
+}): {
+    __kind__: "ok";
+    ok: string;
+} | {
+    __kind__: "err";
+    err: string;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: value.ok
+    } : "err" in value ? {
+        __kind__: "err",
+        err: value.err
+    } : value;
+}
 function from_candid_vec_n4(value: Array<_SignedDelegation>): Array<SignedDelegation> {
     return value.map((x)=>from_candid_SignedDelegation_n5(x));
 }
-function to_candid_DelegationChain_n9(value: DelegationChain): _DelegationChain {
-    return to_candid_record_n10(value);
-}
-function to_candid_SignedDelegation_n12(value: SignedDelegation): _SignedDelegation {
+function to_candid_DelegationChain_n12(value: DelegationChain): _DelegationChain {
     return to_candid_record_n13(value);
 }
-function to_candid_record_n10(value: {
+function to_candid_SignedDelegation_n15(value: SignedDelegation): _SignedDelegation {
+    return to_candid_record_n16(value);
+}
+function to_candid_record_n13(value: {
     publicKey: string;
     delegations: Array<SignedDelegation>;
 }): {
@@ -156,10 +198,10 @@ function to_candid_record_n10(value: {
 } {
     return {
         publicKey: value.publicKey,
-        delegations: to_candid_vec_n11(value.delegations)
+        delegations: to_candid_vec_n14(value.delegations)
     };
 }
-function to_candid_record_n13(value: {
+function to_candid_record_n16(value: {
     signature: string;
     delegation: {
         pubkey: string;
@@ -176,10 +218,10 @@ function to_candid_record_n13(value: {
 } {
     return {
         signature: value.signature,
-        delegation: to_candid_record_n14(value.delegation)
+        delegation: to_candid_record_n17(value.delegation)
     };
 }
-function to_candid_record_n14(value: {
+function to_candid_record_n17(value: {
     pubkey: string;
     targets?: Array<string>;
     expiration: string;
@@ -194,8 +236,8 @@ function to_candid_record_n14(value: {
         expiration: value.expiration
     };
 }
-function to_candid_vec_n11(value: Array<SignedDelegation>): Array<_SignedDelegation> {
-    return value.map((x)=>to_candid_SignedDelegation_n12(x));
+function to_candid_vec_n14(value: Array<SignedDelegation>): Array<_SignedDelegation> {
+    return value.map((x)=>to_candid_SignedDelegation_n15(x));
 }
 export interface CreateActorOptions {
     agent?: Agent;

@@ -21,6 +21,7 @@ export const idlFactory = ({ IDL }) => {
     'publicKey' : IDL.Text,
     'delegations' : IDL.Vec(SignedDelegation),
   });
+  const RegisterResult = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
   
   return IDL.Service({
     'get_delegation' : IDL.Func(
@@ -28,6 +29,8 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(DelegationChain)],
         ['query'],
       ),
+    'lookup_code' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
+    'register' : IDL.Func([IDL.Text, IDL.Text], [RegisterResult], []),
     'store_delegation' : IDL.Func([IDL.Text, DelegationChain], [], []),
   });
 };

@@ -12,7 +12,14 @@ type DelegationChain = record {
   delegations : vec SignedDelegation;
 };
 
+type RegisterResult = variant {
+  ok : text;
+  err : text;
+};
+
 service : {
-  store_delegation : (uuid : text, chain : DelegationChain) -> ();
+  store_delegation : (code : text, chain : DelegationChain) -> ();
   get_delegation : (uuid : text) -> (opt DelegationChain) query;
+  register : (uuid : text, public_key : text) -> (RegisterResult);
+  lookup_code : (code : text) -> (opt text) query;
 }

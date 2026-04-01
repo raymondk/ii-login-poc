@@ -14,6 +14,8 @@ export interface DelegationChain {
   'publicKey' : string,
   'delegations' : Array<SignedDelegation>,
 }
+export type RegisterResult = { 'ok' : string } |
+  { 'err' : string };
 export interface SignedDelegation {
   'signature' : string,
   'delegation' : {
@@ -24,6 +26,8 @@ export interface SignedDelegation {
 }
 export interface _SERVICE {
   'get_delegation' : ActorMethod<[string], [] | [DelegationChain]>,
+  'lookup_code' : ActorMethod<[string], [] | [string]>,
+  'register' : ActorMethod<[string, string], RegisterResult>,
   'store_delegation' : ActorMethod<[string, DelegationChain], undefined>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
