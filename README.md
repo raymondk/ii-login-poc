@@ -1,70 +1,59 @@
-# Hello World
+# II Login PoC
 
-This example demonstrates a full-stack dapp with a frontend and backend canister, showing how to pass environment variables from the asset canister to the frontend webapp.
+A proof-of-concept that lets a CLI tool obtain an Internet Identity delegation chain via a browser-based login flow.
 
-## Overview
+## How It Works
 
-This project consists of two canisters:
+A CLI tool needs to authenticate a user with Internet Identity but can't do so directly. Instead, it opens a browser window that handles the II login and stores the resulting delegation chain in a backend canister for the CLI to retrieve.
 
-- [backend](./backend/): a motoko canister with its [`backend.did`](./backend/backend.did) file.
-- [frontend](./frontend/): a [Vite](https://vite.dev/) webapp deployed in an asset canister.
+### Flow
 
-### Bindings Generation
+1. The CLI generates a key pair and a UUID, then opens the frontend with query parameters `k` (base64-encoded DER public key) and `uuid`
+2. The user signs in with Internet Identity in the browser
+3. The frontend creates a delegation chain from the II identity to the CLI's public key
+4. The delegation chain is stored in the backend canister under the UUID
+5. The browser logs out and closes automatically
+6. The CLI calls `get_delegation` with the UUID to retrieve the delegation chain
 
-The [`@icp-sdk/bindgen`](https://npmjs.com/package/@icp-sdk/bindgen) library offers a plugin for Vite that generates the TypeScript Candid bindings from the [`backend.did`](./backend/backend.did) file. The bindings are generated at build time by Vite and are saved in the [`frontend/app/src/backend/api/`](./frontend/app/src/backend/api/) folder.
+### Frontend
 
-The plugin supports hot module replacement, so you can run the frontend in development mode (by running `npm run dev` in the [`frontend/app/`](./frontend/app/) folder) and make changes to the Candid declaration file to see the bindings being updated in real time.
+A React app that orchestrates the login flow. Query parameters:
 
-See the [`vite.config.ts`](./frontend/app/vite.config.ts) file for how the plugin is used.
+- `k` (required) — base64-encoded DER public key to delegate to
+- `uuid` (required) — identifier for storing/retrieving the delegation (max 36 chars)
+- `debug` (optional) — when present, shows a manual sign-out button instead of auto-closing
 
-### Environment Variables
+### Backend
 
-The project is configured to pass the backend's canister ID to the frontend using a [cookie](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies). The environment variables are made available to the frontend JS code that runs in the browser by following this flow:
+A Motoko canister that stores delegation chains temporarily:
 
-1. During deployment, the `icp` CLI sets the backend's canister ID in the frontend canister's (asset canister) environment variables
-2. The asset canister sets a specific cookie (named `ic_env`) that contains some environment variables when the assets are uploaded
-3. The asset canister serves the frontend assets with the cookie set
-4. The frontend JS code uses the [`@icp-sdk/core/agent/canister-env`](https://js.icp.build/core/latest/canister-environment/) module to parse the cookie and extract the environment variables
+- `store_delegation(uuid, chain)` — stores a delegation chain (requires authenticated caller)
+- `get_delegation(uuid)` — retrieves a delegation chain (returns null if expired)
 
-In the [`App.tsx`](./frontend/app/src/App.tsx) file, you can see how the frontend can obtain the backend's canister ID from the environment variables and use it to create an actor for the backend canister.
+Delegations expire after 5 minutes and are cleaned up on each new store.
 
 ## Prerequisites
-
-Before you begin, ensure that you have the following installed:
 
 - [Node.js](https://nodejs.org/)
 - [npm](https://docs.npmjs.com/)
 
 ## Run It
 
-First, start a local network:
+Start a local network:
 
 ```bash
 icp network start -d
 ```
 
-Then, deploy both canisters:
+Deploy both canisters:
 
 ```bash
 icp deploy
 ```
 
-This command will output something like this:
+Open the frontend at `http://<frontend_canister_id>.localhost:8000/?k=<base64-key>&uuid=<uuid>`. Add `&debug` to keep the sign-out button and console logs visible.
 
-```
-Syncing canisters:
-[backend] ✔ Synced successfully: uqqxf-5h777-77774-qaaaa-cai
-[frontend] ✔ Synced successfully: uxrrr-q7777-77774-qaaaq-cai # <- copy this canister id
-```
-
-Open the deployed frontend in a browser. Copy the frontend's canister ID from the output of the `icp deploy` command and construct the URL in this way: `http://<frontend_canister_id>.localhost:8000/`.
-
-You can also make direct calls to the backend canister:
-```bash
-icp canister call backend greet '("Internet Computer")'
-```
-
-Finally, you can stop the local network with:
+Stop the local network:
 
 ```bash
 icp network stop
