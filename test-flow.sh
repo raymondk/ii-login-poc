@@ -1,34 +1,49 @@
 #!/bin/bash
 set -euo pipefail
 
-UUID=$(uuidgen | tr '[:upper:]' '[:lower:]')
+PORT=8642
 PUBLIC_KEY="dGVzdC1rZXk="
+FRONTEND_URL="http://frontend.local.localhost:8000"
+CALLBACK="http://127.0.0.1:$PORT/callback"
+LOGIN_URL="${FRONTEND_URL}/cli-login?public_key=${PUBLIC_KEY}&callback=${CALLBACK}"
 
-echo "Registering with UUID: $UUID"
-RESULT=$(icp canister call backend register "(\"$UUID\", \"$PUBLIC_KEY\")")
+echo "Starting callback server on 127.0.0.1:$PORT..."
+echo "Opening: $LOGIN_URL"
+open "$LOGIN_URL"
 
-# Extract short code from: (variant { ok = "ABC123" })
-CODE=$(echo "$RESULT" | sed -n 's/.*ok = "\([^"]*\)".*/\1/p')
+python3 -c "
+import http.server, json, sys, threading
 
-if [ -z "$CODE" ]; then
-  echo "Registration failed: $RESULT"
-  exit 1
-fi
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
 
-echo "Short code: $CODE"
-echo ""
-echo "Open http://frontend.local.localhost:8000/cli-login and enter the code above."
-echo "Polling for delegation..."
+    def do_POST(self):
+        if self.path != '/callback':
+            self.send_error(404)
+            return
+        length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(length)
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Content-Type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b'OK')
+        print()
+        print('Delegation received:')
+        try:
+            print(json.dumps(json.loads(body), indent=2))
+        except Exception:
+            print(body.decode())
+        threading.Thread(target=self.server.shutdown).start()
 
-open "http://frontend.local.localhost:8000/cli-login"
+    def log_message(self, fmt, *args):
+        pass  # silence request logs
 
-while true; do
-  DELEGATION=$(icp canister call backend get_delegation "(\"$UUID\")")
-  if [ "$DELEGATION" != "(null)" ]; then
-    echo ""
-    echo "Delegation received:"
-    echo "$DELEGATION"
-    exit 0
-  fi
-  sleep 2
-done
+server = http.server.HTTPServer(('127.0.0.1', $PORT), Handler)
+server.serve_forever()
+"
