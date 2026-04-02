@@ -8,8 +8,16 @@ import Principal "mo:core/Principal";
 import Random "mo:core/Random";
 
 
+/// Stores delegation chains for CLI-based Internet Identity login.
+///
+/// The CLI registers a session (UUID + public key) and receives a short code.
+/// The user enters the code in the browser frontend, which triggers II login
+/// and stores the resulting delegation chain. The CLI then retrieves it by UUID.
+///
+/// All registrations and delegations expire after 5 minutes.
 persistent actor {
 
+  /// A single signed delegation within a chain.
   type SignedDelegation = {
     signature : Text;
     delegation : {
@@ -19,16 +27,19 @@ persistent actor {
     };
   };
 
+  /// A complete delegation chain: root public key + ordered list of signed delegations.
   type DelegationChain = {
     publicKey : Text;
     delegations : [SignedDelegation];
   };
 
+  /// A delegation chain with its storage timestamp for expiration tracking.
   type StoredDelegation = {
     chain : DelegationChain;
     storedAt : Int;
   };
 
+  /// A pending CLI registration: maps a short code to a UUID and public key.
   type Registration = {
     uuid : Text;
     publicKey : Text;
@@ -66,6 +77,7 @@ persistent actor {
 
   transient let random = Random.crypto();
 
+  /// Removes stored delegations older than `cutoff` from the front of the timeline.
   func cleanupExpired(cutoff : Int) {
     loop {
       switch (Queue.peekFront(timeline)) {
@@ -82,6 +94,7 @@ persistent actor {
     };
   };
 
+  /// Removes registrations older than `cutoff` from the front of the timeline.
   func cleanupExpiredRegistrations(cutoff : Int) {
     loop {
       switch (Queue.peekFront(registrationTimeline)) {
@@ -98,6 +111,7 @@ persistent actor {
     };
   };
 
+  /// Generates a random 6-character code from the ambiguity-free charset.
   func generateCode() : async* Text {
     var code = "";
     for (_ in Nat.range(0, codeLength)) {
@@ -107,6 +121,9 @@ persistent actor {
     code;
   };
 
+  /// Registers a CLI session. Stores the UUID and public key, returns a short
+  /// code for the user to enter in the browser frontend.
+  /// Cleans up expired registrations before creating a new one.
   public func register(uuid : Text, publicKey : Text) : async RegisterResult {
     if (uuid.size() == 0 or uuid.size() > maxUuidLength) {
       return #err("Invalid UUID length");
@@ -134,6 +151,8 @@ persistent actor {
     #ok(code);
   };
 
+  /// Looks up a registration code and returns the associated public key,
+  /// or null if the code is invalid or expired.
   public query func lookup_code(code : Text) : async ?Text {
     if (code.size() != codeLength) return null;
     switch (Map.get(registrations, Text.compare, code)) {
@@ -148,6 +167,9 @@ persistent actor {
     };
   };
 
+  /// Stores a delegation chain for the given registration code.
+  /// Requires an authenticated (non-anonymous) caller and a valid, non-expired registration.
+  /// Cleans up expired delegations before storing.
   public shared(msg) func store_delegation(code : Text, chain : DelegationChain) : async () {
     assert not Principal.isAnonymous(msg.caller);
     assert code.size() == codeLength;
@@ -165,6 +187,8 @@ persistent actor {
     };
   };
 
+  /// Retrieves a stored delegation chain by UUID.
+  /// Returns null if the UUID is not found or the delegation has expired.
   public query func get_delegation(uuid : Text) : async ?DelegationChain {
     if (uuid.size() > maxUuidLength) return null;
     switch (Map.get(store, Text.compare, uuid)) {

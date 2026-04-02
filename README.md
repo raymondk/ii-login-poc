@@ -8,45 +8,48 @@ A CLI tool needs to authenticate a user with Internet Identity but can't do so d
 
 ### Flow
 
-1. The CLI generates a key pair and a UUID, then opens the frontend with query parameters `k` (base64-encoded DER public key) and `uuid`
-2. The user signs in with Internet Identity in the browser
-3. The frontend creates a delegation chain from the II identity to the CLI's public key
-4. The delegation chain is stored in the backend canister under the UUID
-5. The browser logs out and closes automatically
-6. The CLI calls `get_delegation` with the UUID to retrieve the delegation chain
+1. The CLI generates a key pair and a UUID
+2. The CLI calls `register(uuid, publicKey)` on the backend canister and receives a 6-character code
+3. The CLI displays the code to the user and opens the frontend at `/cli-login`
+4. The user enters the code in the browser
+5. The frontend calls `lookup_code(code)` to retrieve the CLI's public key
+6. The user signs in with Internet Identity in the browser
+7. The frontend creates a delegation chain from the II identity to the CLI's public key
+8. The delegation chain is stored in the backend canister via `store_delegation(code, chain)`
+9. The browser logs out and closes automatically
+10. The CLI polls `get_delegation(uuid)` to retrieve the delegation chain
 
 ### Frontend
 
-A React app that orchestrates the login flow. Query parameters:
+A React app (Vite + React Router) with two routes:
 
-- `k` (required) — base64-encoded DER public key to delegate to
-- `uuid` (required) — identifier for storing/retrieving the delegation (max 36 chars)
+- `/` — basic II login demo
+- `/cli-login` — the code-based CLI login flow
+
+The `/cli-login` route presents an OTP-style input where the user enters the 6-character code displayed by the CLI. Query parameters:
+
 - `debug` (optional) — when present, shows a manual sign-out button instead of auto-closing
 
 ### Backend
 
-A Motoko canister that stores delegation chains temporarily:
+A Motoko canister that manages registrations and stores delegation chains temporarily:
 
-- `store_delegation(uuid, chain)` — stores a delegation chain (requires authenticated caller)
-- `get_delegation(uuid)` — retrieves a delegation chain (returns null if expired)
+- `register(uuid, publicKey)` — registers a CLI session and returns a 6-character code (requires authenticated caller)
+- `lookup_code(code)` — returns the public key for a registration code (query, unauthenticated)
+- `store_delegation(code, chain)` — stores a delegation chain against a registration code (requires authenticated caller)
+- `get_delegation(uuid)` — retrieves a delegation chain (query, unauthenticated, returns null if expired)
 
-Delegations expire after 5 minutes and are cleaned up on each new store.
+Registrations and delegations expire after 5 minutes and are cleaned up on each new store. Codes are generated from a 32-character alphabet (A–Z excluding I and O, plus 2–9) to avoid ambiguous characters.
 
 ## Known Vulnerabilities
 
 This is a proof-of-concept and has several security issues that must be addressed before production use.
 
-### Session Fixation (Critical)
-
-The target public key (`k`) and session ID (`uuid`) are passed as URL query parameters with no server-side verification. An attacker can craft a link with their own public key and UUID, send it to a victim, and the victim's II login will delegate to the attacker's key. The attacker then retrieves the delegation and has both the chain and the matching private key — full impersonation for up to 8 hours.
-
-**Mitigation:** Use an out-of-band confirmation code (similar to Bluetooth pairing). The CLI generates a short code and displays it in the terminal. The frontend displays the same code derived from the session, and the user confirms they match before authenticating. A phishing link would show a code the user can't verify against their own CLI, making the attack detectable. Simply moving the public key from the URL to a pre-registration step does not help — the attacker can register their own key and send a phishing link with their UUID.
-
 ### Delegation Overwrite (High)
 
-Any authenticated caller can overwrite any UUID's stored delegation. An attacker could replace a legitimate delegation with garbage (DoS) or with their own delegation.
+Any authenticated caller can overwrite a delegation for a valid registration code. An attacker who knows the code could replace a legitimate delegation with garbage (DoS) or with their own.
 
-**Mitigation:** Only allow one write per UUID, or bind the UUID to the caller's principal.
+**Mitigation:** Only allow one write per code, or bind the code to the caller's principal.
 
 ### UUID Predictability (Medium)
 
@@ -54,12 +57,16 @@ Any authenticated caller can overwrite any UUID's stored delegation. An attacker
 
 **Mitigation:** Enforce cryptographically random UUIDs with sufficient entropy. Consider delete-on-read semantics.
 
+### Code Brute-Force (Medium)
+
+The 6-character code has ~30 bits of entropy (32^6 ≈ 1 billion combinations). With a 5-minute expiry window this is likely sufficient, but there is no rate limiting on `lookup_code`.
+
+**Mitigation:** Add rate limiting or lockout after failed lookup attempts.
+
 ### Other Issues
 
 - Delegation chain is logged to the browser console (`console.log`) — capturable by extensions
 - 8-hour delegation lifetime with no revocation mechanism
-- UUID in URL leaks via browser history, referer headers, and server logs
-- No public key format validation on the `k` parameter
 - Draining cycles by performing many registrations
 
 ## Prerequisites
@@ -81,7 +88,9 @@ Deploy both canisters:
 icp deploy
 ```
 
-Open the frontend at `http://<frontend_canister_id>.localhost:8000/?k=<base64-key>&uuid=<uuid>`. Add `&debug` to keep the sign-out button and console logs visible.
+Open the frontend at `http://<frontend_canister_id>.localhost:8000/cli-login`. Add `?debug` to keep the sign-out button and console logs visible.
+
+Run the `./test-flow.sh` to test out the flow.
 
 Stop the local network:
 
