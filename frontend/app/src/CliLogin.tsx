@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AuthClient } from "@icp-sdk/auth/client";
 import { HttpAgent } from "@icp-sdk/core/agent";
 import {
@@ -58,6 +58,8 @@ async function createDelegationForKey(
 function CliLogin() {
   const [authClient, setAuthClient] = useState<AuthClient | null>(null);
   const [shortCode, setShortCode] = useState("");
+  const CODE_LENGTH = 6;
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [validatedCode, setValidatedCode] = useState<string | null>(null);
   const [targetPublicKey, setTargetPublicKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -173,28 +175,63 @@ function CliLogin() {
               Enter the one time code displayed in your terminal.
             </p>
             <form className="form" onSubmit={handleCodeSubmit}>
-              <div className="controls">
-                <input
-                  className="input"
-                  type="text"
-                  value={shortCode}
-                  onChange={(e) =>
-                    setShortCode(
-                      e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, "").slice(0, 6)
-                    )
-                  }
-                  placeholder="ABC123"
-                  maxLength={6}
-                  autoFocus
-                />
-                <button
-                  className="button"
-                  type="submit"
-                  disabled={shortCode.length !== 6}
-                >
-                  Submit
-                </button>
+              <div className="code-boxes">
+                {Array.from({ length: CODE_LENGTH }).map((_, i) => (
+                  <input
+                    key={i}
+                    ref={(el) => { inputRefs.current[i] = el; }}
+                    className="code-box"
+                    type="text"
+                    inputMode="text"
+                    maxLength={1}
+                    autoFocus={i === 0}
+                    value={shortCode[i] ?? ""}
+                    onChange={(e) => {
+                      const char = e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, "");
+                      if (!char) return;
+                      const next = shortCode.slice(0, i) + char + shortCode.slice(i + 1);
+                      setShortCode(next);
+                      if (i < CODE_LENGTH - 1) {
+                        inputRefs.current[i + 1]?.focus();
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Backspace") {
+                        if (shortCode[i]) {
+                          setShortCode(shortCode.slice(0, i) + shortCode.slice(i + 1));
+                        } else if (i > 0) {
+                          inputRefs.current[i - 1]?.focus();
+                          setShortCode(shortCode.slice(0, i - 1) + shortCode.slice(i));
+                        }
+                        e.preventDefault();
+                      } else if (e.key === "ArrowLeft" && i > 0) {
+                        inputRefs.current[i - 1]?.focus();
+                      } else if (e.key === "ArrowRight" && i < CODE_LENGTH - 1) {
+                        inputRefs.current[i + 1]?.focus();
+                      }
+                    }}
+                    onPaste={(e) => {
+                      e.preventDefault();
+                      const pasted = e.clipboardData
+                        .getData("text")
+                        .toUpperCase()
+                        .replace(/[^A-Z2-9]/g, "")
+                        .slice(0, CODE_LENGTH);
+                      setShortCode(pasted);
+                      const focusIdx = Math.min(pasted.length, CODE_LENGTH - 1);
+                      setTimeout(() => inputRefs.current[focusIdx]?.focus(), 0);
+                    }}
+                    onFocus={(e) => e.target.select()}
+                  />
+                ))}
               </div>
+              <button
+                className="button"
+                type="submit"
+                disabled={shortCode.length !== CODE_LENGTH}
+              >
+                Submit
+              </button>
               {error && (
                 <p className="subtitle" style={{ color: "var(--accent)" }}>
                   {error}

@@ -63,6 +63,34 @@
   color: var(--muted);
 }
 
+/* OTP-style code boxes */
+.code-boxes {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.code-box {
+  appearance: none;
+  width: 48px;
+  height: 56px;
+  background: var(--input);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 24px;
+  font-weight: 600;
+  text-align: center;
+  text-transform: uppercase;
+  caret-color: var(--accent);
+}
+
+.code-box:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
 .button {
   appearance: none;
   border: 1px solid transparent;
