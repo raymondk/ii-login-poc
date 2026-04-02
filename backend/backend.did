@@ -22,4 +22,5 @@ service : {
   get_delegation : (uuid : text) -> (opt DelegationChain) query;
   register : (uuid : text, public_key : text) -> (RegisterResult);
   lookup_code : (code : text) -> (opt text) query;
+  whoami : () -> (principal) query;
 }

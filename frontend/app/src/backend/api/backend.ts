@@ -75,6 +75,7 @@ export interface backendInterface {
     lookup_code(code: string): Promise<string | null>;
     register(uuid: string, public_key: string): Promise<RegisterResult>;
     store_delegation(code: string, chain: DelegationChain): Promise<void>;
+    whoami(): Promise<Principal>;
 }
 import type { DelegationChain as _DelegationChain, RegisterResult as _RegisterResult, SignedDelegation as _SignedDelegation } from "./declarations/backend.did";
 export class Backend implements backendInterface {
@@ -93,6 +94,10 @@ export class Backend implements backendInterface {
     }
     async store_delegation(arg0: string, arg1: DelegationChain): Promise<void> {
         const result = await this.actor.store_delegation(arg0, to_candid_DelegationChain_n12(arg1));
+        return result;
+    }
+    async whoami(): Promise<Principal> {
+        const result = await this.actor.whoami();
         return result;
     }
 }

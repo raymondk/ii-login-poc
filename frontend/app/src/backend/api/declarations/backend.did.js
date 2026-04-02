@@ -32,6 +32,7 @@ export const idlFactory = ({ IDL }) => {
     'lookup_code' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
     'register' : IDL.Func([IDL.Text, IDL.Text], [RegisterResult], []),
     'store_delegation' : IDL.Func([IDL.Text, DelegationChain], [], []),
+    'whoami' : IDL.Func([], [IDL.Principal], ['query']),
   });
 };
 

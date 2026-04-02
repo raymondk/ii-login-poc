@@ -29,6 +29,7 @@ export interface _SERVICE {
   'lookup_code' : ActorMethod<[string], [] | [string]>,
   'register' : ActorMethod<[string, string], RegisterResult>,
   'store_delegation' : ActorMethod<[string, DelegationChain], undefined>,
+  'whoami' : ActorMethod<[], Principal>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

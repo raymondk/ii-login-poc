@@ -187,6 +187,11 @@ persistent actor {
     };
   };
 
+  /// Returns the principal of the caller.
+  public shared query(msg) func whoami() : async Principal {
+    msg.caller;
+  };
+
   /// Retrieves a stored delegation chain by UUID.
   /// Returns null if the UUID is not found or the delegation has expired.
   public query func get_delegation(uuid : Text) : async ?DelegationChain {
