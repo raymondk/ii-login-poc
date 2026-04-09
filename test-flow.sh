@@ -5,7 +5,7 @@ PORT=8642
 PUBLIC_KEY="dGVzdC1rZXk="
 FRONTEND_URL="http://frontend.local.localhost:8000"
 CALLBACK="http://127.0.0.1:$PORT/callback"
-LOGIN_URL="${FRONTEND_URL}/cli-login?public_key=${PUBLIC_KEY}&callback=${CALLBACK}"
+LOGIN_URL="${FRONTEND_URL}/cli-login#public_key=${PUBLIC_KEY}&callback=${CALLBACK}"
 
 echo "Starting callback server on 127.0.0.1:$PORT..."
 echo "Opening: $LOGIN_URL"

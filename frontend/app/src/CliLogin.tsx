@@ -1,49 +1,9 @@
 import { useState, useEffect } from "react";
 import { AuthClient } from "@icp-sdk/auth/client";
-import {
-  DelegationChain,
-  DelegationIdentity,
-  type JsonnableDelegationChain,
-} from "@icp-sdk/core/identity";
-import type { PublicKey, DerEncodedPublicKey } from "@icp-sdk/core/agent";
-import { getIdentityProviderUrl, base64ToBytes } from "./utils";
+import { parseCliLoginParams, performCliLogin, type Step } from "./cli-auth";
 import "./App.css";
 
-const params = new URLSearchParams(window.location.search);
-const publicKeyParam = params.get("public_key");
-const callbackParam = params.get("callback");
-const debugParam = params.has("debug");
-
-type Step = "ready" | "signing-in" | "sending" | "finished" | "error";
-
-async function createDelegationForKey(
-  authClient: AuthClient,
-  targetPublicKeyBase64: string
-): Promise<JsonnableDelegationChain | null> {
-  const identity = authClient.getIdentity();
-  if (!(identity instanceof DelegationIdentity)) {
-    console.error("Expected a DelegationIdentity after login");
-    return null;
-  }
-
-  const targetDerBytes = base64ToBytes(targetPublicKeyBase64);
-  const derKey = Object.assign(targetDerBytes, {
-    toDer() {
-      return derKey;
-    },
-  }) as DerEncodedPublicKey;
-  const targetPublicKey: PublicKey = { toDer: () => derKey };
-
-  const existingChain = identity.getDelegation();
-  const delegationChain = await DelegationChain.create(
-    identity,
-    targetPublicKey,
-    new Date(Date.now() + 8 * 60 * 60 * 1000),
-    { previous: existingChain }
-  );
-
-  return delegationChain.toJSON();
-}
+const cliParams = parseCliLoginParams(window.location.hash);
 
 function CliLogin() {
   const [authClient, setAuthClient] = useState<AuthClient | null>(null);
@@ -54,7 +14,7 @@ function CliLogin() {
     AuthClient.create({ keyType: "Ed25519" }).then(setAuthClient);
   }, []);
 
-  if (!publicKeyParam || !callbackParam) {
+  if (!cliParams) {
     return (
       <main className="page">
         <section className="panel">
@@ -68,49 +28,19 @@ function CliLogin() {
   }
 
   function handleLogin() {
-    if (!authClient) return;
-    setStep("signing-in");
+    if (!authClient || !cliParams) return;
     setError(null);
 
-    authClient.login({
-      identityProvider: getIdentityProviderUrl(),
-      maxTimeToLive: BigInt(8) * BigInt(3_600_000_000_000),
-      onSuccess: async () => {
-        setStep("sending");
-        try {
-          const delegation = await createDelegationForKey(authClient, publicKeyParam!);
-          if (!delegation) {
-            setError("Failed to create delegation chain.");
-            setStep("error");
-            return;
-          }
-
-          const response = await fetch(callbackParam!, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(delegation),
-          });
-
-          if (!response.ok) {
-            setError(`Callback failed: ${response.status} ${response.statusText}`);
-            setStep("error");
-            return;
-          }
-
-          setStep("finished");
-          if (!debugParam) {
-            await authClient.logout();
-            setTimeout(() => window.close(), 3000);
-          }
-        } catch (err) {
-          console.error("Delegation/callback failed:", err);
-          setError(`Failed to send delegation: ${err}`);
-          setStep("error");
-        }
+    performCliLogin(authClient, cliParams, {
+      onSigningIn: () => setStep("signing-in"),
+      onSending: () => setStep("sending"),
+      onFinished: () => {
+        authClient.logout();
+        setStep("finished");
+        setTimeout(() => window.close(), 2000);
       },
-      onError: (loginError) => {
-        console.error("Login failed:", loginError);
-        setError(`Sign-in failed: ${loginError}`);
+      onError: (message) => {
+        setError(message);
         setStep("error");
       },
     });
@@ -146,16 +76,7 @@ function CliLogin() {
 
         {step === "finished" && (
           <>
-            {debugParam ? (
-              <>
-                <p className="subtitle">Delegation sent. Debug mode — sign out manually.</p>
-                <button className="button" onClick={() => authClient?.logout()}>
-                  Sign out
-                </button>
-              </>
-            ) : (
               <p className="subtitle">Done! You can close this window.</p>
-            )}
           </>
         )}
 
