@@ -29,9 +29,12 @@ export function parseCliLoginParams(hash: string): CliLoginParams | null {
   return { publicKey, callback };
 }
 
+const DEFAULT_EXPIRATION_MS = 8 * 60 * 60 * 1000; // 8 hours
+
 export async function createDelegationForKey(
   authClient: AuthClient,
-  targetPublicKeyBase64: string
+  targetPublicKeyBase64: string,
+  expirationMs: number = DEFAULT_EXPIRATION_MS
 ): Promise<JsonnableDelegationChain | null> {
   const identity = authClient.getIdentity();
   if (!(identity instanceof DelegationIdentity)) {
@@ -51,7 +54,7 @@ export async function createDelegationForKey(
   const delegationChain = await DelegationChain.create(
     identity,
     targetPublicKey,
-    new Date(Date.now() + 8 * 60 * 60 * 1000),
+    new Date(Date.now() + expirationMs),
     { previous: existingChain }
   );
 
@@ -61,17 +64,18 @@ export async function createDelegationForKey(
 export function performCliLogin(
   authClient: AuthClient,
   params: CliLoginParams,
-  callbacks: CliLoginCallbacks
+  callbacks: CliLoginCallbacks,
+  expirationMs: number = DEFAULT_EXPIRATION_MS
 ): void {
   callbacks.onSigningIn();
 
   authClient.login({
     identityProvider: getIdentityProviderUrl(),
-    maxTimeToLive: BigInt(8) * BigInt(3_600_000_000_000),
+    maxTimeToLive: BigInt(expirationMs) * BigInt(1_000_000),
     onSuccess: async () => {
       callbacks.onSending();
       try {
-        const delegation = await createDelegationForKey(authClient, params.publicKey);
+        const delegation = await createDelegationForKey(authClient, params.publicKey, expirationMs);
         if (!delegation) {
           callbacks.onError("Failed to create delegation chain.");
           return;
