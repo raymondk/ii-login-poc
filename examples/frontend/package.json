@@ -1,0 +1,7 @@
+{
+  "name": "icp-frontend-environment-variables",
+  "private": true,
+  "scripts": {
+    "build": "pnpm --filter app build"
+  }
+}

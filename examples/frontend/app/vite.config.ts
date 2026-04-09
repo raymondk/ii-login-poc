@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { execSync } from "child_process";
+import path from "path";
 
 // Usage: ICP_ENVIRONMENT=staging npm run dev
 const environment = process.env.ICP_ENVIRONMENT || "local";
@@ -11,8 +12,14 @@ export default defineConfig(({ command }) => {
     react(),
   ];
 
+  const resolve = {
+    alias: {
+      "@icp-sdk/cli-auth": path.resolve(__dirname, "../../../src/index.ts"),
+    },
+  };
+
   if (command !== "serve") {
-    return { plugins };
+    return { plugins, resolve };
   }
 
   // Dev server mode: configure ic_env cookie and proxy
@@ -40,6 +47,7 @@ export default defineConfig(({ command }) => {
   return {
     plugins,
     server,
+    resolve,
   };
 
 });

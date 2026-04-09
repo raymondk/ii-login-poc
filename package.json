@@ -1,5 +1,44 @@
 {
+  "name": "@icp-sdk/cli-auth",
+  "version": "0.1.0",
+  "description": "CLI authentication via Internet Identity delegation",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "types": {
+        "import": "./dist/esm/index.d.ts",
+        "require": "./dist/cjs/index.d.cts"
+      },
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "vite build && pnpm lint:package",
+    "lint:package": "publint --strict",
+    "codestyle:check": "biome check",
+    "codestyle:fix": "biome check --write"
+  },
+  "peerDependencies": {
+    "@icp-sdk/auth": "~5.0.0",
+    "@icp-sdk/core": "~5.2.0"
+  },
   "devDependencies": {
-    "@types/node": "^25.5.0"
-  }
+    "@biomejs/biome": "2.4.8",
+    "@tanstack/vite-config": "^0.5.2",
+    "publint": "^0.3.18",
+    "typescript": "~5.8.3",
+    "vite": "^8.0.2",
+    "vitest": "^4.1.4"
+  },
+  "packageManager": "pnpm@9.9.0"
 }

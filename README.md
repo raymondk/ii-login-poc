@@ -1,70 +1,88 @@
-# II Login PoC
+# @icp-sdk/cli-auth
 
-A proof-of-concept that lets a CLI tool obtain an Internet Identity delegation chain via a browser-based login flow.
+A library for authenticating CLI tools with [Internet Identity](https://id.ai) via a browser-based delegation flow.
 
-## How It Works
+## Overview
 
-A CLI tool needs to authenticate a user with Internet Identity but can't do so directly. Instead, it opens a browser window that handles the II login, creates a delegation chain, and POSTs it to a callback URL provided by the CLI.
+CLI tools can't interact with Internet Identity directly. This library provides the browser-side logic to handle the login, create a delegation chain for the CLI's public key, and POST it back to the CLI via a callback URL.
 
 ### Flow
 
-1. The CLI generates a key pair and starts a local HTTP server on a free port
-2. The CLI opens the browser at the frontend's `/cli-login` route with query parameters:
-   - `public_key` — the CLI's public key (base64-encoded DER)
-   - `callback` — the URL to POST the delegation chain to (e.g. `http://localhost:PORT/callback`)
-3. The user clicks "Sign in with Internet Identity"
-4. The frontend creates a delegation chain from the II identity to the CLI's public key
-5. The frontend POSTs the delegation chain (JSON) to the callback URL
-6. The CLI receives the delegation chain and shuts down the HTTP server
-7. The browser shows a success message and can be closed
+1. The CLI generates a key pair and starts a local HTTP server
+2. The CLI opens a browser with the frontend's login page, passing `public_key` and `callback` as URL parameters
+3. The user signs in with Internet Identity
+4. The library creates a delegation chain from the II identity to the CLI's public key
+5. The delegation chain is POSTed to the CLI's callback URL
+6. The CLI receives the delegation and can make authenticated calls
 
-### Frontend
-
-A React app (Vite + React Router) with two routes:
-
-- `/` — basic II login demo
-- `/cli-login` — the CLI login flow
-
-The `/cli-login` route reads the CLI's public key and callback URL from query parameters, handles II authentication, creates a delegation chain, and POSTs it back. Query parameters:
-
-- `public_key` (required) — base64-encoded DER public key to delegate to
-- `callback` (required) — URL to POST the delegation chain JSON to
-- `debug` (optional) — when present, shows a manual sign-out button instead of auto-closing
-
-### Backend
-
-A Motoko canister with a utility endpoint:
-
-- `whoami()` — returns the caller's principal (useful for verifying the delegation works)
-
-## Prerequisites
-
-- [Node.js](https://nodejs.org/)
-- [npm](https://docs.npmjs.com/)
-
-## Run It
-
-Start a local network:
+## Install
 
 ```bash
-icp network start -d
+npm install @icp-sdk/cli-auth
 ```
 
-Deploy canisters:
+Peer dependencies: `@icp-sdk/auth` and `@icp-sdk/core`.
 
-```bash
-icp deploy
+## Usage
+
+```ts
+import { parseCliLoginParams, performCliLogin } from "@icp-sdk/cli-auth";
+import { AuthClient } from "@icp-sdk/auth/client";
+
+// Parse public_key and callback from the URL hash
+const params = parseCliLoginParams(window.location.hash);
+
+const authClient = await AuthClient.create({ keyType: "Ed25519" });
+
+performCliLogin(authClient, params, {
+  onSigningIn: () => console.log("Waiting for Internet Identity..."),
+  onSending: () => console.log("Sending delegation to CLI..."),
+  onFinished: () => console.log("Done!"),
+  onError: (message) => console.error(message),
+}, {
+  identityProvider: "https://id.ai",
+});
 ```
 
-Open the frontend at:
-```
-http://<frontend_canister_id>.localhost:8000/cli-login?public_key=BASE64KEY&callback=http://localhost:PORT/callback
+## Callback Payload
+
+The delegation chain is POSTed as JSON to the CLI's callback URL:
+
+```json
+{
+  "publicKey": "302a300506032b6570032100...",
+  "delegations": [
+    {
+      "delegation": {
+        "pubkey": "302a300506032b6570032100...",
+        "expiration": "1757389200000000000"
+      },
+      "signature": "aef..."
+    }
+  ]
+}
 ```
 
-Add `?debug` to keep the sign-out button visible.
+All values are hex-encoded. The `expiration` is in nanoseconds since the Unix epoch. The `targets` field may optionally appear in a delegation to scope it to specific canister IDs.
 
-Stop the local network:
+## API
 
-```bash
-icp network stop
-```
+### `parseCliLoginParams(hash: string): CliLoginParams | null`
+
+Parses `public_key` and `callback` from a URL hash string. Returns `null` if either parameter is missing.
+
+### `createDelegationForKey(authClient, publicKeyBase64, expirationMs?): Promise<JsonnableDelegationChain | null>`
+
+Creates a delegation chain from the authenticated identity to the given public key. Defaults to 8 hours expiration.
+
+### `performCliLogin(authClient, params, callbacks, options): void`
+
+Runs the full login flow: triggers II authentication, creates the delegation, and POSTs it to the callback URL.
+
+**Options:**
+- `identityProvider` — the Internet Identity URL
+- `expirationMs` — optional delegation expiration in milliseconds (default: 8 hours)
+
+## License
+
+Apache-2.0
